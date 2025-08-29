@@ -14,10 +14,6 @@ class ScheduleDate:
         self.special_notes: List[str] = special_notes if special_notes else []
 
 
-def ScheduleDateKey(day: ScheduleDate) -> date:
-    return day.day
-
-
 class DefaultScheduleDate(ScheduleDate):
     def __init__(self: DefaultScheduleDate, day: date) -> None:
         super().__init__(day)
@@ -50,10 +46,12 @@ class ScheduleDateBuilder:
         return self.WithSlot(time(18))
 
     def WithSlot(self: ScheduleDateBuilder, time: time) -> ScheduleDateBuilder:
-        self.day.slots.append(ShowSlot(datetime.combine(self.day.day, time)))
+        if self.day:
+            self.day.slots.append(ShowSlot(datetime.combine(self.day.day, time)))
         return self
 
     #should be only for special dates...
     def WithNote(self: ScheduleDateBuilder, note: str) -> ScheduleDateBuilder:
-        self.day.special_notes.append(note)
+        if self.day:
+            self.day.special_notes.append(note)
         return self

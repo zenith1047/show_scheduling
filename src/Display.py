@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional, Set, Iterable
+from typing import List, Optional, Set, Iterable, cast
 from datetime import date, timedelta
 from ScheduleDate import ScheduleDate
 from Schedule import Schedule
@@ -56,7 +56,7 @@ def pad_week(week: PrintWeek, start_date: date, num_pad: int):
 
 def to_print_weeks(schedule: Schedule) -> List[PrintWeek]:
     print_weeks: List[PrintWeek] = []
-    schedule_date: ScheduleDate = schedule.schedule[0]
+    schedule_date: ScheduleDate = cast(ScheduleDate, schedule.schedule[0])
     days_back: int = sunday_first_weekday(schedule_date.day)
     curr_week: PrintWeek = PrintWeek()
     #pad front so that we start on a sunday
@@ -112,6 +112,15 @@ def schedule_episode_pool(schedule: Schedule) -> str:
 
     return "\n".join(episodes_list)
 
+
+#this won't work beecause i've been deleting shows from the dict as i add them to the schedule
+#keep an alias pointer to the show in the episodes? cyclic...
+#hvae schedule just move between all shows and available shows...
+#have schedule keep all shows present but skip over ones with no episodes?
+#def order_show_names_by_show_color(show_names: Iterable[str], shows: dict[str, Show]) -> List[str]:
+    #pass
+
+
 def schedule_paste_format(schedule: Schedule, pending_shows: Iterable[Show]) -> str:
     weeks_display: List[str] = schedule_to_csv(schedule).split("\n")
     remaining_episodes_display: List[str] = schedule_episode_pool(schedule).split("\n")
@@ -122,6 +131,7 @@ def schedule_paste_format(schedule: Schedule, pending_shows: Iterable[Show]) -> 
         for slot in day.slots:
             if slot.episode:
                 shows_set.add(slot.episode.show_name)
+
     shows_display: List[str] = list(shows_set)
     shows_display.sort()
 
