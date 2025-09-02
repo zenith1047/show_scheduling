@@ -75,6 +75,7 @@ def build_show_pool() -> dict[str, Show]:
 
 def build_schedule_dates() -> Schedule:
     builder: ScheduleBuilder = ScheduleBuilder()
+
     builder.RegisterSpecialDate(lambda builder: builder
                                 .SpecialDate(date(2025, 8, 24))
                                 .WithLunchSlot()
@@ -153,14 +154,15 @@ if __name__ == '__main__':
     stopped: date = schedule.generate_schedule(start=start_date)
     register_shows(schedule, shows, ["Penny Dreadful S3"])
     stopped = schedule.generate_schedule(start=stopped)
-    register_shows(schedule, shows, ["Dickinson S1"])
+    register_shows(schedule, shows, ["Dickinson S1", "Slow Horses S5", "Your Friends & Neighbors"])
     stopped = schedule.generate_schedule(start=stopped)
-    register_shows(schedule, shows, ["Slow Horses S5", "Your Friends & Neighbors"])
     stopped = schedule.generate_schedule(start=stopped)
     register_shows(schedule, shows, ["Chief of War", "The Talamasca", "Drops of God"])
     stopped = schedule.generate_schedule(start=stopped)
     stopped = schedule.generate_schedule(start=stopped)
     stopped = schedule.generate_schedule(start=stopped)
+    register_shows(schedule, shows, ["Gen V S2", "Downton Abbey S1", "Alien: Earth", "Only Murders in the Building S5"])
+    stopped = schedule.generate_schedule(start=stopped, end=date(2025, 11, 1))
 
     print(Display.schedule_to_string(schedule)) 
 

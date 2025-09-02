@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import List, Optional, Set, Iterable, cast
+from typing import List, Optional, Set, Iterable, Dict, cast
 from datetime import date, timedelta
 from ScheduleDate import ScheduleDate
 from Schedule import Schedule
@@ -44,41 +44,25 @@ class PrintWeek:
         return "\n".join(csv)
 
 
-# date.weekday() but with sunday = 0 instead of 6
-def sunday_first_weekday(date: date) -> int:
-    return (date.weekday() + 1) % 7
-
-
-def pad_week(week: PrintWeek, start_date: date, num_pad: int):
-    for i in range(0, num_pad):
-        week.days.append(PrintDay(start_date + timedelta(days=i)))
-
-
 def to_print_weeks(schedule: Schedule) -> List[PrintWeek]:
     print_weeks: List[PrintWeek] = []
-    schedule_date: ScheduleDate = cast(ScheduleDate, schedule.schedule[0])
-    days_back: int = sunday_first_weekday(schedule_date.day)
     curr_week: PrintWeek = PrintWeek()
-    #pad front so that we start on a sunday
-    pad_week(curr_week, schedule_date.day - timedelta(days=days_back), days_back)
-
-    for schedule_date in schedule.schedule:
+    start: date = cast(date, schedule.schedule.earliest_sunday())
+    end: date = cast(date, schedule.schedule.latest_saturday())
+    for day in (start + timedelta(days=i) for i in range((end - start).days + 1)):
         if len(curr_week.days) == DAYS_IN_WEEK:
             print_weeks.append(curr_week)
             curr_week = PrintWeek()
-        print_day: PrintDay = PrintDay(schedule_date.day)
-        for i, slot in enumerate((slot for slot in schedule_date.slots)):
-            if slot.episode:
-                print_day.rows[i + 1] = slot.episode.display_name()
-        if schedule_date.special_notes:
-            print_day.rows[4] = "; ".join(schedule_date.special_notes)
+        print_day: PrintDay = PrintDay(day)
+        if day in schedule.schedule:
+            schedule_date: ScheduleDate = schedule.schedule[day]
+            for i, slot in enumerate((slot for slot in schedule_date.slots)):
+                if slot.episode:
+                    print_day.rows[i + 1] = slot.episode.display_name()
+            if schedule_date.special_notes:
+                print_day.rows[4] = "; ".join(schedule_date.special_notes)
         curr_week.days.append(print_day)
 
-    #collect items in groups of seven
-    print_date: PrintDay = curr_week.days[-1]
-    days_left: int = 6 - sunday_first_weekday(print_date.day)
-    #pad back to end on a saturday
-    pad_week(curr_week, print_date.day + timedelta(days=1), days_left)
     print_weeks.append(curr_week)
     return print_weeks
 
@@ -94,13 +78,16 @@ def schedule_to_string(schedule: Schedule) -> str:
     spacer: str = "\n" + "-" * length + "\n"
     return spacer.join(pretty)
 
+
 def schedule_to_csv(schedule: Schedule, separator: str = ",") -> str:
     print_weeks: List[PrintWeek] = to_print_weeks(schedule)
     pretty: List[str] = [week.to_csv(separator) for week in print_weeks]
     return "\n".join(pretty)
 
+
 def schedule_to_tab_delimited(schedule: Schedule) -> str:
     return schedule_to_csv(schedule, "\t")
+
 
 def schedule_episode_pool(schedule: Schedule) -> str:
     pretty: str = ""
@@ -113,12 +100,27 @@ def schedule_episode_pool(schedule: Schedule) -> str:
     return "\n".join(episodes_list)
 
 
-#this won't work beecause i've been deleting shows from the dict as i add them to the schedule
-#keep an alias pointer to the show in the episodes? cyclic...
-#hvae schedule just move between all shows and available shows...
-#have schedule keep all shows present but skip over ones with no episodes?
-#def order_show_names_by_show_color(show_names: Iterable[str], shows: dict[str, Show]) -> List[str]:
-    #pass
+def order_shows_by_color(shows: Iterable[Show]) -> List[str]:
+    def is_unassigned(label: str) -> bool:
+        return all(c == '.' for c in label)
+
+    max_shows: int = 16
+    show_names: List[str] = ["." * (i + 1) for i in range(0, max_shows)]
+    #don't want to overwrite any colors already assigned
+    #want to populate show names with no color arbitrarily
+    uncolored_shows: List[Show] = []
+    for show in shows:
+        if show.color >= 0 and show.color < max_shows and is_unassigned(show_names[show.color]):
+            show_names[show.color] = show.name
+        else:
+            uncolored_shows.append(show)
+    for i in range(0, max_shows):
+        if is_unassigned(show_names[i]) and uncolored_shows:
+            show: Show = uncolored_shows.pop(0)
+            show_names[i] = show.name
+    if uncolored_shows:
+        show_names += (show.name for show in uncolored_shows)
+    return show_names
 
 
 def schedule_paste_format(schedule: Schedule, pending_shows: Iterable[Show]) -> str:
@@ -126,16 +128,10 @@ def schedule_paste_format(schedule: Schedule, pending_shows: Iterable[Show]) -> 
     remaining_episodes_display: List[str] = schedule_episode_pool(schedule).split("\n")
     pending_episodes: List[str] = [ep.display_name() for show in pending_shows for ep in show.episodes]
     remaining_episodes_display += pending_episodes
-    shows_set: Set[str] = set()
-    for day in schedule.schedule:
-        for slot in day.slots:
-            if slot.episode:
-                shows_set.add(slot.episode.show_name)
+    shows_set: Set[Show] = set(schedule.shows + schedule.empty_shows)
+    shows_display: List[str] = order_shows_by_color(shows_set)
 
-    shows_display: List[str] = list(shows_set)
-    shows_display.sort()
-
-    max_shows: int = 15
+    max_shows: int = 16
     if len(shows_display) < max_shows:
         for i in range(len(shows_display), max_shows):
             shows_display.append("." * i)
